@@ -76,6 +76,23 @@ MOOS DB.
 │             pShare    │              │
 └──────────────────────────────────────┘
 ```
+```
+┌──────────────────────────────┐     ┌─────────────────────────────────┐
+│       MOOS-IvP Mission       │     │       External Ecosystems       │
+│  ┌──────────────────────┐    │TCP  │  ┌───────────────────────────┐  │
+│  │    iMOOSGateway      │◄───┼─────┼─►│   protobuf_client_ros2    │  │
+│  │  (TCP Server Hub)    │    │     │  │       (ROS 2 Node)        │  │
+│  └──────────┬───────────┘    │     │  └───────────────────────────┘  │
+│        ┌────▼─────┐          │TCP  │  ┌───────────────────────────┐  │
+│        │  MOOSDB  │          │◄────┼─►│     iMAVLinkBridge        │  │
+│        │  NAV_X/Y │          │     │  │  (ArduSub / PX4 / UAV)    │  │
+│        │  DEPLOY  │          │TCP  │  └───────────────────────────┘  │
+│        └──────────┘          │◄────┼─►│      iMOOSClient          │  │
+└──────────────────────────────┘     │  │  (Remote MOOS Community)  │  │
+                                     │  └───────────────────────────┘  │
+                                     └─────────────────────────────────┘
+```
+MEI architecture — iMOOSGateway serves as a central hub for all client types.
 
 ---
 
