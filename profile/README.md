@@ -99,7 +99,8 @@ MEI architecture — iMOOSGateway serves as a central hub for all client types.
 ## Field-Proven
 
 The MIT MOOS Gateway has been developed, tested, and deployed on autonomous
-surface vehicles (ASVs) operating in real ocean environments.  It supports
+surface vehicles (ASVs) operating in real ocean environments.  It supports multiple
+DARPA and ONR funded projects to inclued
 multi-vehicle formation missions including underway replenishment (UNREP)
 operations where precise inter-vessel coordination is safety-critical.
 
