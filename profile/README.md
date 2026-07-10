@@ -1,6 +1,6 @@
 # MIT MOOS Gateway
 
-**Bidirectional MOOS-IvP ↔ ROS 2 middleware bridge for autonomous marine vehicles.**
+**Bidirectional MOOS-IvP ↔ ROS 2 middleware bridge for autonomous vehicles.**
 
 Developed at the [MIT AUV Lab](https://oceanai.mit.edu), Department of
 Mechanical Engineering.  The MIT MOOS Gateway connects the proven
