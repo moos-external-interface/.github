@@ -29,9 +29,10 @@ The MIT MOOS Gateway makes both available simultaneously — no need to choose.
 A ROS 2 node (`protobuf_client_node`) that acts as a TCP client to
 `iMOOSGateway`, bridging MOOS variables and ROS 2 topics bidirectionally via
 Google Protocol Buffers.  Built on Boost ASIO for non-blocking I/O with a
-50 Hz update rate, automatic reconnection, and a heartbeat mechanism that
-keeps the connection alive through gateway restarts and network interruptions.
-Supports multi-robot deployments via configurable robot IDs and ports.
+configurable polling interval, automatic reconnection, and a heartbeat
+mechanism that keeps the connection alive through gateway restarts and
+network interruptions. Supports multi-robot deployments via configurable
+robot IDs and ports.
 
 ### [`lib_gateway_tcp`](https://github.com/mit-moos-gateway/lib_gateway_tcp)
 
@@ -55,28 +56,6 @@ MOOS DB.
 ## Architecture
 
 ```
-┌──────────────────────────────────────┐
-│             ROS 2 Graph              │
-│                                      │
-│  Perception  ◄──── /gateway_msg      │
-│  Navigation                          │
-│  Simulation  ────► /send_to_gateway  │
-│  (Gazebo)                            │
-└─────────────────┬────────────────────┘
-                  │ TCP + Protobuf
-                  │ (lib_gateway_tcp)
-                  │ 50 Hz | auto-reconnect
-┌─────────────────▼────────────────────┐
-│           MOOS Community             │
-│                                      │
-│  iMOOSGateway ◄──► MOOSDB            │
-│                       │              │
-│             pHelmIvP  │              │
-│             pNodeReport              │
-│             pShare    │              │
-└──────────────────────────────────────┘
-```
-```
 ┌──────────────────────────────┐     ┌─────────────────────────────────┐
 │       MOOS-IvP Mission       │     │       External Ecosystems       │
 │  ┌──────────────────────┐    │TCP  │  ┌───────────────────────────┐  │
@@ -99,10 +78,14 @@ MEI architecture — iMOOSGateway serves as a central hub for all client types.
 ## Field-Proven
 
 The MIT MOOS Gateway has been developed, tested, and deployed on autonomous
-surface vehicles (ASVs) operating in real ocean environments.  It supports multiple
-DARPA and ONR funded projects to inclued
-multi-vehicle formation missions including underway replenishment (UNREP)
-operations where precise inter-vessel coordination is safety-critical.
+surface vehicles (ASVs) operating in real ocean environments.  It supports
+multiple DARPA and ONR funded projects, including multi-vehicle formation
+missions such as underway replenishment (UNREP) operations where precise
+inter-vessel coordination is safety-critical.
+
+Latency and throughput have been characterized through instrumented
+testing: the gateway sustains multi-Hz bidirectional telemetry and command
+exchange between MOOS-IvP and ROS 2 with zero measured message loss.
 
 Integration has been validated with:
 
@@ -121,10 +104,3 @@ or reach out via the MIT AUV Lab for inquiries.
 
 **Authors:** Michael DeFilippo, Dr. Supun Randeni
 **Institution:** MIT Department of Mechanical Engineering
-
----
-
-*Keywords: MOOS-IvP ROS2 bridge, maritime autonomy middleware, autonomous
-surface vehicle, ASV ROS2, MOOS ROS integration, multi-vehicle coordination,
-marine robotics middleware, ROS2 Jazzy MOOS, iMOOSGateway, protobuf MOOS,
-underway replenishment autonomy, MIT AUV Lab.*
