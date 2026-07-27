@@ -102,5 +102,5 @@ The MIT MOOS Gateway is available for licensing for research, commercial, and
 government applications.  Please contact the MIT Technology Licensing Office
 or reach out via the MIT AUV Lab for inquiries.
 
-**Authors:** Michael DeFilippo, Dr. Supun Randeni
+**Authors:** Michael DeFilippo (mikedef@mit.edu), Dr. Supun Randeni (supun@mit.edu)
 **Institution:** MIT Department of Mechanical Engineering
