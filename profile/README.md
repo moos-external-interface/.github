@@ -14,13 +14,16 @@ without forcing you to adopt one monolithic integration layer.
 
 Each integration serves a different user, so each is its own package.
 
-- **The MOOSDB is the only contract.** Packages exchange data through MOOS
-  variables, never through shared code. Run one, several, or all of them.
+- **The MOOSDB is the contract between packages.** MEI packages exchange data
+  through MOOS variables and do not depend on each other's code. Run one,
+  several, or all of them. The small socket libraries they need are bundled
+  into each package.
 - **Use only what you need.** A TAK deployment does not pull in a MAVLink
-  driver. A C2 integration does not pull in DDS.
-- **Safe by default.** Commanding is off until you enable it. Commands are
-  default-deny and allowlisted per vehicle. A stale or silent peer stops the
-  vehicle rather than leaving it running.
+  driver. An API integration does not pull in DDS.
+- **Safe by default.** Commanding is opt-in or allowlisted per package. Where a
+  package commands a vehicle it fails safe: a stale helm stops the MAVLink
+  bridge, the TAK joystick has a deadman timer, and the API has a configurable
+  lost-link action.
 - **Built for the MOOS loop.** Single-threaded, non-blocking, driven from
   `Iterate()`. Linux targets.
 
@@ -32,7 +35,7 @@ Each integration serves a different user, so each is its own package.
  │ / C++ clients  │       │
  └────────────────┘       │
  ┌────────────────┐   ┌───┴──────────┐
- │ 3rd-party C2   │◄──┤  MEI: C2     │
+ │ 3rd-party C2   │◄──┤  MEI: API    │
  └────────────────┘   └───┬──────────┘
  ┌────────────────┐   ┌───┴──────────┐        ┌─────────┐        ┌──────────────┐
  │ ATAK / WebTAK  │◄──┤  MEI: TAK    ├───────►│         │◄───────┤ MEI: MAVLink ├──► ArduPilot / PX4
@@ -51,12 +54,23 @@ Each integration serves a different user, so each is its own package.
 
 | Package | What it does | Typical user | Status |
 |---|---|---|---|
-| [**MEI: Gateway**](https://github.com/moos-external-interface/moos-ivp-gateway) | Shares MOOS variables with non-MOOS programs over TCP and Protocol Buffers | Teams bridging ROS 2 or custom software to MOOS | Wire protocol v1.0.0 frozen; Python and C++ clients |
+| [**MEI: Gateway**](https://github.com/moos-external-interface/moos-ivp-gateway) | Shares MOOS variables with ROS 2 and other non-MOOS programs over TCP and Protocol Buffers. Includes a ROS 2 client and Python and C++ client libraries | Teams bridging ROS 2 or custom software to MOOS | Field-tested; wire protocol v1.0.0 frozen; ROS 2 Humble and Jazzy |
 | [**MEI: MAVLink**](https://github.com/moos-external-interface/moos-ivp-mavlink) | MOOS-IvP as the backseat driver for any MAVLink autopilot | Vehicle builders and integrators | ArduRover validated on hardware and in SITL; ArduCopter in SITL only |
-| [**MEI: C2**](https://github.com/moos-external-interface/moos-ivp-c2) | A vendor-neutral command-and-control interface: telemetry out, validated commands in | C2 platform vendors and programs | Automated end-to-end suite (30 scenarios) |
-| [**MEI: TAK**](https://github.com/moos-external-interface/moos-ivp-tak) | Puts MOOS vehicles on a TAK map and accepts waypoints and routes from TAK users | TAK operators and defense customers | In development; coexistence with MEI: C2 in progress |
+| [**MEI: API**](https://github.com/moos-external-interface/moos-ivp-api) | A vendor-neutral command-and-control interface: telemetry out, validated commands in | C2 platform vendors and programs | Automated end-to-end suite (32 scenarios) |
+| [**MEI: TAK**](https://github.com/moos-external-interface/moos-ivp-tak) | Puts MOOS vehicles on a TAK map and accepts waypoints and routes from TAK users | TAK operators and defense customers | Field-tested |
 | [**MEI: DDS**](https://github.com/moos-external-interface/moos-ivp-dds) | Translates between DDS and MOOS, starting with UMAA MO ICD v6.0 messages | UMAA and DDS integrators | Early development |
-| [**lib_posix_comms**](https://github.com/moos-external-interface/lib_posix_comms) | Shared non-blocking socket classes (TCP, TLS, UDP multicast) | Used inside several MEI packages | Versioned separately |
+| [**lib_posix_comms**](https://github.com/moos-external-interface/lib_posix_comms) | Shared non-blocking socket classes (TCP, TLS, UDP multicast) | Bundled into MEI: API and MEI: TAK | Versioned separately, v1.0.1 |
+| [**lib_gateway_tcp**](https://github.com/moos-external-interface/lib_gateway_tcp) | TCP client and server for Protocol Buffer messages, built on Boost.Asio | Bundled into MEI: Gateway | Versioned separately, v1.0.0 |
+
+### What is in each package
+
+| Package | Repositories | Bundled library |
+|---|---|---|
+| MEI: Gateway | [`moos-ivp-gateway`](https://github.com/moos-external-interface/moos-ivp-gateway), [`protobuf_client`](https://github.com/moos-external-interface/protobuf_client) (ROS 2 client and message package), [`gateway_clients`](https://github.com/moos-external-interface/gateway_clients) (Python and C++) | `lib_gateway_tcp` |
+| MEI: MAVLink | [`moos-ivp-mavlink`](https://github.com/moos-external-interface/moos-ivp-mavlink) | none |
+| MEI: API | [`moos-ivp-api`](https://github.com/moos-external-interface/moos-ivp-api) | `lib_posix_comms` |
+| MEI: TAK | [`moos-ivp-tak`](https://github.com/moos-external-interface/moos-ivp-tak), [`atak-plugins`](https://github.com/moos-external-interface/atak-plugins) | `lib_posix_comms` |
+| MEI: DDS | [`moos-ivp-dds`](https://github.com/moos-external-interface/moos-ivp-dds) | none |
 
 ---
 
@@ -65,13 +79,14 @@ Each integration serves a different user, so each is its own package.
 A general-purpose door into the MOOSDB. `iMOOSGateway` is a TCP server that
 forwards the MOOS variables you list to external clients and accepts variables
 back, using Protocol Buffers. `iMOOSClient` is the inverse, for a vehicle that
-connects out to a central server. Python and C++ client libraries are provided,
-along with a ROS 2 client.
+connects out to a central server. The ROS 2 client (`protobuf_client`) turns
+that traffic into ROS 2 topics, and `gateway_clients` offers the same to Python
+and C++ programs.
 
 ```
- ROS 2 node ──┐
- Python app ──┼──TCP/protobuf──►  iMOOSGateway ◄──► MOOSDB
- C++ app    ──┘                     (forward / block lists, heartbeats)
+ ROS 2 node  (protobuf_client)  ──┐
+ Python app  (gateway_clients)  ──┼──TCP/protobuf──►  iMOOSGateway ◄──► MOOSDB
+ C++ app     (gateway_clients)  ──┘                    (forward / block lists, heartbeats)
 ```
 
 Use it when something that is not MOOS needs to read or write MOOS variables.
@@ -90,7 +105,7 @@ opt in.
                                               └────── NAV_* / MAVLINK_* ◄────┘
 ```
 
-## MEI: C2
+## MEI: API
 
 `iC2Gateway` gives an external C2 system one clean interface to a MOOS vehicle,
 using length-prefixed protobuf messages over TCP.
@@ -147,8 +162,15 @@ This package is early. Expect the scope to grow service by service.
 Small, non-blocking POSIX socket classes for use inside a MOOS `Iterate()` loop:
 TCP client and server, TLS client with certificate authentication, and UDP
 multicast receive. No threads, no callbacks, no exceptions. The caller owns the
-loop. It is versioned in its own repository and shipped with each package that
-uses it.
+loop. It is versioned in its own repository and bundled, as a pinned copy, into
+MEI: API and MEI: TAK.
+
+## lib_gateway_tcp
+
+A TCP client and server for length-delimited Protocol Buffer messages, built on
+Boost.Asio. It is the transport under MEI: Gateway, on both the MOOS side and
+the ROS 2 side. It is versioned in its own repository and bundled, as a pinned
+copy, into the Gateway's MOOS applications and its ROS 2 client.
 
 ---
 
@@ -158,11 +180,11 @@ uses it.
 |---|---|
 | Read or write MOOS variables from ROS 2 or my own code | MEI: Gateway |
 | Drive an ArduPilot or PX4 vehicle from the MOOS helm | MEI: MAVLink |
-| Let a C2 system command and monitor my vehicle | MEI: C2 |
+| Let a C2 system command and monitor my vehicle | MEI: API |
 | See my vehicle in ATAK or send it waypoints from TAK | MEI: TAK |
 | Connect MOOS to a DDS or UMAA system | MEI: DDS |
 
-Packages combine freely. A vehicle running MEI: MAVLink and MEI: C2 exposes
+Packages combine freely. A vehicle running MEI: MAVLink and MEI: API exposes
 arm, disarm, and mode control to a C2 purely through MOOS variables.
 
 ## Licensing and contact
