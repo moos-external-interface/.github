@@ -17,13 +17,16 @@ Each integration serves a different user, so each is its own package.
 - **The MOOSDB is the contract between packages.** MEI packages exchange data
   through MOOS variables and do not depend on each other's code. Run one,
   several, or all of them. The small socket libraries they need are bundled
-  into each package.
+  into each package. The one exception is MEI: Agent's `c2agent`, a client of
+  the MEI: API wire protocol (a pinned copy of its `.proto`, not its code);
+  its `pAgent` follows the MOOSDB contract like every other package.
 - **Use only what you need.** A TAK deployment does not pull in a MAVLink
   driver. An API integration does not pull in DDS.
 - **Safe by default.** Commanding is opt-in or allowlisted per package. Where a
   package commands a vehicle it fails safe: a stale helm stops the MAVLink
   bridge, the TAK joystick has a deadman timer, and the API has a configurable
-  lost-link action.
+  lost-link action. Agents are read-only by default: pAgent writes are
+  allowlisted, and c2agent commands need operator confirmation.
 - **Built for the MOOS loop.** Single-threaded, non-blocking, driven from
   `Iterate()`. Linux targets.
 
@@ -44,8 +47,13 @@ Each integration serves a different user, so each is its own package.
  │ DDS / UMAA     │◄──┤  MEI: DDS    ├───────►│         │──► pHelmIvP (autonomy)
  └────────────────┘   └───┬──────────┘        │         │
  ┌────────────────┐   ┌───┴──────────┐        │         │
- │ Any TCP client │◄──┤ MEI: Gateway ├───────►│         │
- └────────────────┘   └──────────────┘        └─────────┘
+ │ Any TCP client │◄──┤ MEI: Gateway ├───────►│         │◄───────┐
+ └────────────────┘   └──────────────┘        └─────────┘        │
+ ┌────────────────┐   ┌──────────────┐                       ┌────┴─────────┐
+ │ C2 operator,   │◄──┤ MEI: Agent   ├──► MEI: API (above)   │ MEI: Agent   │
+ │ Claude Code    │   │ c2agent      │    proposals only     │ pAgent (LLM  │
+ └────────────────┘   └──────────────┘                       │ monitor)     │
+                                                             └──────────────┘
 ```
 
 ---
@@ -59,6 +67,7 @@ Each integration serves a different user, so each is its own package.
 | [**MEI: API**](https://github.com/moos-external-interface/moos-ivp-api) | A vendor-neutral command-and-control interface: telemetry out, validated commands in | C2 platform vendors and programs | Automated end-to-end suite (32 scenarios) |
 | [**MEI: TAK**](https://github.com/moos-external-interface/moos-ivp-tak) | Puts MOOS vehicles on a TAK map and accepts waypoints and routes from TAK users | TAK operators and defense customers | Field-tested |
 | [**MEI: DDS**](https://github.com/moos-external-interface/moos-ivp-dds) | Translates between DDS and MOOS, starting with UMAA MO ICD v6.0 messages | UMAA and DDS integrators | Early development |
+| [**MEI: Agent**](https://github.com/moos-external-interface/moos-ivp-agent) | LLM agents that monitor vehicles through the MOOSDB (`pAgent`) or command them through MEI: API (`c2agent`), with every command confirmed by an operator | Labs and C2 operators | Simulation-tested (11 MOOS scenarios, red-team suite, model matrix); first on-water test (Blue Boat) next |
 | [**lib_posix_comms**](https://github.com/moos-external-interface/lib_posix_comms) | Shared non-blocking socket classes (TCP, TLS, UDP multicast) | Bundled into MEI: API and MEI: TAK | Versioned separately, v1.0.1 |
 | [**lib_gateway_tcp**](https://github.com/moos-external-interface/lib_gateway_tcp) | TCP client and server for Protocol Buffer messages, built on Boost.Asio | Bundled into MEI: Gateway | Versioned separately, v1.0.0 |
 
@@ -71,6 +80,7 @@ Each integration serves a different user, so each is its own package.
 | MEI: API | [`moos-ivp-api`](https://github.com/moos-external-interface/moos-ivp-api) | `lib_posix_comms` |
 | MEI: TAK | [`moos-ivp-tak`](https://github.com/moos-external-interface/moos-ivp-tak), [`atak-plugins`](https://github.com/moos-external-interface/atak-plugins) | `lib_posix_comms` |
 | MEI: DDS | [`moos-ivp-dds`](https://github.com/moos-external-interface/moos-ivp-dds) | none |
+| MEI: Agent | [`moos-ivp-agent`](https://github.com/moos-external-interface/moos-ivp-agent) (`pAgent`, `c2agent`) | none (c2agent pins MEI: API's `.proto`) |
 
 ---
 
@@ -157,6 +167,32 @@ side, the vehicle side, or both.
 
 This package is early. Expect the scope to grow service by service.
 
+## MEI: Agent
+
+LLM agents for MOOS-IvP, with Claude, a local model through Ollama, or any
+OpenAI-compatible server.
+
+- **`pAgent`** is a MOOS app. It reads the MOOSDB, posts a one-line status
+  summary on a timer, answers operator questions (`AGENT_QUERY`) and raises
+  alerts, for one vehicle or, on the shoreside, a whole fleet. The model runs
+  off the MOOS thread, so `Iterate()` never blocks, and `AGENT_ENABLE=false`
+  stops it at once. An opt-in write mode posts a short allowlist of
+  mission-level variables (such as `RETURN=true`), rate limited; `DESIRED_*`,
+  arm, disarm and mode variables can never be allowlisted.
+- **`c2agent`** sits next to a C2. It watches each vehicle's MEI: API gateway
+  as an observer (it cannot command or affect lost-link while watching) and
+  offers its tools to Claude Code over MCP, or to a chat pane in MEI: API's
+  web C2. Every action becomes a proposal that only an operator confirms,
+  from a terminal or by sliding a card; the command then carries that
+  operator's id.
+
+```
+ Operator ──confirm──┐
+ Claude Code ──MCP──►├─ c2agent ──observer / controller──► iC2Gateway ──► MOOSDB
+ web C2 chat pane ───┘  (proposals, policy, audit)                         ▲
+                                                             pAgent ◄─────┘ (monitor)
+```
+
 ## lib_posix_comms
 
 Small, non-blocking POSIX socket classes for use inside a MOOS `Iterate()` loop:
@@ -183,6 +219,7 @@ copy, into the Gateway's MOOS applications and its ROS 2 client.
 | Let a C2 system command and monitor my vehicle | MEI: API |
 | See my vehicle in ATAK or send it waypoints from TAK | MEI: TAK |
 | Connect MOOS to a DDS or UMAA system | MEI: DDS |
+| Let an AI agent monitor my vehicles, or command them through a C2 | MEI: Agent |
 
 Packages combine freely. A vehicle running MEI: MAVLink and MEI: API exposes
 arm, disarm, and mode control to a C2 purely through MOOS variables.
